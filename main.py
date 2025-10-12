@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 neighborhood_coords = [[0, -1], [1, 0], [0, 1], [-1, 0]]
 
 # Core logic
+## Generate Graph
 def get_vertex_neighborhood(x: int, y: int, maxX: int, maxY: int):
     neighborhood_vertices_coords = []
     for dx, dy in neighborhood_coords:
@@ -22,6 +23,25 @@ def generate_grid_graph(rowCount: int, colCount: int):
         for x in range(0, colCount):
             graph[(x, y)] = get_vertex_neighborhood(x, y, colCount, rowCount)
     return graph
+
+## is_connected graph
+def is_connected_dfs(graph: dict):
+    vertecies = set(graph.keys())
+    if not vertecies:
+        return True
+    
+    start = next(iter(vertecies))
+    visited = set()
+
+    def dfs(v):
+        visited.add(v)
+        for w in graph.get(v, []):
+            if w not in visited:
+                dfs(w)
+
+    dfs(start)
+    return visited == vertecies
+
 
 # Draw logic
 def draw_edges(graph: dict):
@@ -51,7 +71,10 @@ def draw_graph(graph: dict, rowSize: int, colSize: int):
     plt.title("Візуалізація графа (дороги)")
     plt.show()
 
+
 graph = generate_grid_graph(5, 5)
 print(graph)
+
+print(is_connected_dfs(graph))
 
 draw_graph(graph, 5, 5)
