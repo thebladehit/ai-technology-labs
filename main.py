@@ -120,12 +120,11 @@ def draw_graph(graph: dict, rowSize: int, colSize: int):
     plt.title("Візуалізація графа (дороги)")
     plt.show()
 
+# Wrapper
+def setup_lab(rowCount: int = 5, colCount: int = 5, edgeToDelCount: int = 5):
+    graph = generate_grid_graph(rowCount, colCount)
+    draw_graph(graph, rowCount, colCount)
+    graph = remove_random_edges(graph, edgeToDelCount, rowCount, colCount)
+    draw_graph(graph, rowCount, colCount)
 
-graph = generate_grid_graph(5, 5)
-print(graph)
-
-print(is_connected_dfs(graph))
-
-# draw_graph(graph, 5, 5)
-graph = remove_random_edges(graph, 16, 5, 5)
-draw_graph(graph, 5, 5)
+setup_lab(5, 5, 10)
