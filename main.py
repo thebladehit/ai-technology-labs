@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+import random
+import copy
 
 neighborhood_coords = [[0, -1], [1, 0], [0, 1], [-1, 0]]
 
@@ -42,6 +44,53 @@ def is_connected_dfs(graph: dict):
     dfs(start)
     return visited == vertecies
 
+## Remove random edge
+def remove_random_edge(graph: dict):
+    copy_graph = copy.deepcopy(graph)
+    edges = []
+    for u, neighbors in copy_graph.items():
+        for v in neighbors:
+            if (v, u) not in edges:
+                edges.append((u, v))
+    
+    if not edges:
+        return None
+    
+    u, v = random.choice(edges)
+
+    if v in copy_graph[u]:
+        copy_graph[u].remove(v)
+    if u in copy_graph[v]:
+        copy_graph[v].remove(u)
+
+    return copy_graph
+
+def remove_random_edges(graph: dict, count: int, rowCount: int, colCount: int):
+    if count > (rowCount * colCount - 1):
+        raise ValueError("You can't delete this count of edges")
+    
+    graph_copy = copy.deepcopy(graph)
+    i = 0
+    attempts = 0
+    
+    while i < count: 
+        while True:
+            new_graph = remove_random_edge(graph_copy)
+            attempts += 1
+            if not new_graph:
+                graph_copy = copy.deepcopy(graph)
+                i = -1
+                break
+            if is_connected_dfs(new_graph):
+                graph_copy = copy.deepcopy(new_graph)
+                break
+            if attempts > 10:
+                graph_copy = copy.deepcopy(graph)
+                i = -1
+                break
+
+        i += 1
+    return graph_copy
 
 # Draw logic
 def draw_edges(graph: dict):
@@ -77,4 +126,6 @@ print(graph)
 
 print(is_connected_dfs(graph))
 
+# draw_graph(graph, 5, 5)
+graph = remove_random_edges(graph, 16, 5, 5)
 draw_graph(graph, 5, 5)
