@@ -92,6 +92,38 @@ def remove_random_edges(graph: dict, count: int, rowCount: int, colCount: int):
         i += 1
     return graph_copy
 
+# Agent logic
+class Agent:
+    def __init__(self, graph, start, goal):
+        self.graph = graph
+        self.cur_pos = start
+        self.goal = goal
+        self.visited = set()
+        self.path = [ start ]
+        self.full_path = [ start ]
+    
+    def move_to_goal(self):
+        while self.cur_pos != self.goal:
+            self.visited.add(self.cur_pos)
+
+            neigbours = self.graph.get(self.cur_pos, [])
+            unvisited_neigbours = [v for v in neigbours if v not in self.visited]
+
+            if unvisited_neigbours:
+                next_vertex = random.choice(unvisited_neigbours)
+                self.cur_pos = next_vertex
+                self.path.append(next_vertex)
+            else:
+                if len(self.path) > 1:
+                    self.path.pop()
+                    self.cur_pos = self.path[-1]
+                else:
+                    print('Unable to find path to goal')
+                    return []
+            self.full_path.append(self.cur_pos)
+        
+        return [self.path, self.full_path]
+        
 # Draw logic
 def draw_edges(graph: dict):
     drawn_edges = set()
@@ -120,11 +152,38 @@ def draw_graph(graph: dict, rowSize: int, colSize: int):
     plt.title("Візуалізація графа (дороги)")
     plt.show()
 
+def draw_visited_vertices(vertices: list):
+    for [x, y] in vertices:
+        plt.scatter(x, y, color="orange", s=150, edgecolors="black", zorder=3)
+
+
+def draw_path(graph: dict, rowSize: int, colSize: int, path: list, title: str, color: str):
+    visited_vertices = []
+    for [x, y] in path:
+        plt.figure(figsize=(colSize, rowSize))
+        draw_edges(graph)
+        draw_vertices(graph)
+        draw_visited_vertices(visited_vertices)
+        plt.scatter(x, y, color=color, s=150, edgecolors="black", zorder=3)
+        plt.axis("equal")
+        plt.gca().invert_yaxis()
+        plt.axis("off")
+        plt.title(title)
+        plt.show()
+        visited_vertices.append((x, y))
+        
 # Wrapper
 def setup_lab(rowCount: int = 5, colCount: int = 5, edgeToDelCount: int = 5):
     graph = generate_grid_graph(rowCount, colCount)
+    print(graph)
     draw_graph(graph, rowCount, colCount)
     graph = remove_random_edges(graph, edgeToDelCount, rowCount, colCount)
     draw_graph(graph, rowCount, colCount)
+
+    agent = Agent(graph, (0, 0), (3, 4))
+    [path, full_path] = agent.move_to_goal()
+    print('path = ', path)
+    draw_path(graph, rowCount, colCount, full_path, 'Full path', 'yellow')
+    draw_path(graph, rowCount, colCount, path, 'Path', 'green')
 
 setup_lab(5, 5, 10)
