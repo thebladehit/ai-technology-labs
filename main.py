@@ -98,29 +98,70 @@ class Agent:
         self.graph = graph
         self.cur_pos = start
         self.goal = goal
-        self.visited = set()
+        self.stack = []
+        # Knowledge base
+        self.knowledge_base = {
+            'visited': set(),
+            'self_graph': dict(),
+        }
         self.path = [ start ]
         self.full_path = [ start ]
+
+    def tell_knowledge_base_roads(self, road, possible: list):
+        if road in self.knowledge_base['visited']:
+            return
+        
+        self.knowledge_base['self_graph'].setdefault(self.cur_pos, [])
+        if road not in self.knowledge_base['self_graph'][self.cur_pos]:
+            self.knowledge_base['self_graph'][self.cur_pos].append(road)
+
+        if road not in self.knowledge_base['self_graph']:
+            self.knowledge_base['self_graph'][road] = possible
+
+    def tell_knowledge_base_visited(self, visited):
+        self.knowledge_base['visited'].add(visited)
     
+    def ask_next_move(self):
+        roads = self.knowledge_base['self_graph'][self.cur_pos]
+        for road in roads:
+            if road == self.goal:
+                return road
+            if road in self.knowledge_base['visited']:
+                continue
+            next_roads = self.knowledge_base['self_graph'][road]
+            if len(next_roads) == 0:
+                continue
+            for next_road in next_roads:
+                if next_road in self.knowledge_base['visited']:
+                    continue
+                return road
+        return None
+            
+    def read_sign(self, road):
+        neigbours = self.graph.get(road, [])
+        return neigbours
+
     def move_to_goal(self):
         while self.cur_pos != self.goal:
-            self.visited.add(self.cur_pos)
+            self.tell_knowledge_base_visited(self.cur_pos)
+            print(self.cur_pos)
+            self.stack.append(self.cur_pos)
+            roads = self.graph.get(self.cur_pos, [])
 
-            neigbours = self.graph.get(self.cur_pos, [])
-            unvisited_neigbours = [v for v in neigbours if v not in self.visited]
-
-            if unvisited_neigbours:
-                next_vertex = random.choice(unvisited_neigbours)
-                self.cur_pos = next_vertex
-                self.path.append(next_vertex)
-            else:
-                if len(self.path) > 1:
-                    self.path.pop()
-                    self.cur_pos = self.path[-1]
-                else:
-                    print('Unable to find path to goal')
-                    return []
-            self.full_path.append(self.cur_pos)
+            for road in roads:
+                # print(self.cur_pos)
+                road_sign = self.read_sign(road)
+                self.tell_knowledge_base_roads(road, road_sign)
+            
+            next_vertex = self.ask_next_move()
+            if (next_vertex == None and len(self.stack) == 0):
+                print('Unable to find path to goal')
+                return [self.path, self.full_path]
+            elif (next_vertex == None):
+                self.stack.pop()
+                next_vertex = self.stack.pop()
+            self.path.append(next_vertex)
+            self.cur_pos = next_vertex
         
         return [self.path, self.full_path]
         
@@ -183,7 +224,7 @@ def setup_lab(rowCount: int = 5, colCount: int = 5, edgeToDelCount: int = 5):
     agent = Agent(graph, (0, 0), (3, 4))
     [path, full_path] = agent.move_to_goal()
     print('path = ', path)
-    draw_path(graph, rowCount, colCount, full_path, 'Full path', 'yellow')
+    # draw_path(graph, rowCount, colCount, full_path, 'Full path', 'yellow')
     draw_path(graph, rowCount, colCount, path, 'Path', 'green')
 
 setup_lab(5, 5, 10)
