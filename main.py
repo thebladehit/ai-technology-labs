@@ -105,7 +105,6 @@ class Agent:
             'self_graph': dict(),
         }
         self.path = [ start ]
-        self.full_path = [ start ]
 
     def tell_knowledge_base_roads(self, road, possible: list):
         if road in self.knowledge_base['visited']:
@@ -156,14 +155,14 @@ class Agent:
             next_vertex = self.ask_next_move()
             if (next_vertex == None and len(self.stack) == 0):
                 print('Unable to find path to goal')
-                return [self.path, self.full_path]
+                return [self.path]
             elif (next_vertex == None):
                 self.stack.pop()
                 next_vertex = self.stack.pop()
             self.path.append(next_vertex)
             self.cur_pos = next_vertex
         
-        return [self.path, self.full_path]
+        return [self.path]
         
 # Draw logic
 def draw_edges(graph: dict):
@@ -222,9 +221,8 @@ def setup_lab(rowCount: int = 5, colCount: int = 5, edgeToDelCount: int = 5):
     draw_graph(graph, rowCount, colCount)
 
     agent = Agent(graph, (0, 0), (3, 4))
-    [path, full_path] = agent.move_to_goal()
+    [path] = agent.move_to_goal()
     print('path = ', path)
-    # draw_path(graph, rowCount, colCount, full_path, 'Full path', 'yellow')
     draw_path(graph, rowCount, colCount, path, 'Path', 'green')
 
 setup_lab(5, 5, 10)
