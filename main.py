@@ -1,10 +1,45 @@
 import matplotlib.pyplot as plt
 import random
 import copy
+import torch
+import torchvision
+from torchvision import transforms
+from ai import Net
 
-neighborhood_coords = [[0, -1], [1, 0], [0, 1], [-1, 0]]
+## Trained Network
+model = Net()
+model.load_state_dict(torch.load('./results/model.pth', map_location='cpu'))
+model.eval()
+
+transform = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Normalize((0.1307,), (0.3081,))
+])
+test_dataset = torchvision.datasets.MNIST(
+    './files',
+    train=True,
+    download=True,
+    transform=transform
+)
+
+def get_rand_image():
+    while True:
+        idx = random.randint(0, len(test_dataset)-1)
+        image, label = test_dataset[idx]
+        if label >= 2:
+            image = image.unsqueeze(0)
+            return [image, label]
+
+
+def recognize(image):
+    with torch.no_grad():
+        output = model(image)
+        pred = output.argmax(dim=1)
+    return pred.item()
 
 # Core logic
+neighborhood_coords = [[0, -1], [1, 0], [0, 1], [-1, 0]]
+
 ## Generate Graph
 def get_vertex_neighborhood(x: int, y: int, maxX: int, maxY: int):
     neighborhood_vertices_coords = []
@@ -92,10 +127,21 @@ def remove_random_edges(graph: dict, count: int, rowCount: int, colCount: int):
         i += 1
     return graph_copy
 
+def generate_graph_speed(graph: dict):
+    graph_speed = {}
+    for v, neighbors in graph.items():
+        for neigh in neighbors:
+            if graph_speed.get((v, neigh)) or graph_speed.get((neigh, v)):
+                continue
+            image_data = get_rand_image()
+            graph_speed[(v, neigh)] = image_data
+    return graph_speed
+
 # Agent logic
 class Agent:
-    def __init__(self, graph, start, goal):
+    def __init__(self, graph, graph_spped, start, goal):
         self.graph = graph
+        self.graph_spped = graph_spped
         self.cur_pos = start
         self.goal = goal
         self.stack = []
@@ -104,6 +150,9 @@ class Agent:
             'visited': set(),
             'self_graph': dict(),
         }
+        self.actual_total_speed = 0
+        self.total_speed = 0
+        self.cur_speed = [ 0 ]
         self.path = [ start ]
 
     def tell_knowledge_base_roads(self, road, possible: list):
@@ -139,16 +188,21 @@ class Agent:
     def read_sign(self, road):
         neigbours = self.graph.get(road, [])
         return neigbours
+    
+    def recognize_speed_limit(self, next_vertex):
+        image_data = self.graph_spped.get((self.cur_pos, next_vertex)) or self.graph_spped.get((next_vertex, self.cur_pos)) 
+        recognized_speed = recognize(image_data[0])
+        self.cur_speed.append(recognized_speed)
+        self.total_speed += recognized_speed
+        self.actual_total_speed += image_data[1]
 
     def move_to_goal(self):
         while self.cur_pos != self.goal:
             self.tell_knowledge_base_visited(self.cur_pos)
-            print(self.cur_pos)
             self.stack.append(self.cur_pos)
             roads = self.graph.get(self.cur_pos, [])
 
             for road in roads:
-                # print(self.cur_pos)
                 road_sign = self.read_sign(road)
                 self.tell_knowledge_base_roads(road, road_sign)
             
@@ -159,10 +213,11 @@ class Agent:
             elif (next_vertex == None):
                 self.stack.pop()
                 next_vertex = self.stack.pop()
+            self.recognize_speed_limit(next_vertex)
             self.path.append(next_vertex)
             self.cur_pos = next_vertex
         
-        return [self.path]
+        return [self.path, self.total_speed, self.cur_speed, self.actual_total_speed]
         
 # Draw logic
 def draw_edges(graph: dict):
@@ -182,10 +237,20 @@ def draw_vertices(graph: dict):
         plt.scatter(x, y, color="skyblue", s=150, edgecolors="black", zorder=3)
         plt.text(x, y + 0.2, f"{vertex}", ha="center", fontsize=8)
 
-def draw_graph(graph: dict, rowSize: int, colSize: int):
+def draw_speed(graph_speed: dict):
+    for vertex, s_info in graph_speed.items():
+        left, right = vertex
+        x = left[0] if left[0] == right[0] else left[0] + 0.5
+        y = left[1] if left[1] == right[1] else left[1] + 0.5
+        plt.text(x, y, f"{s_info[1] * 10}", ha="center", fontsize=8)
+        # print(vertex, s_info[1])
+
+def draw_graph(graph: dict, rowSize: int, colSize: int, graph_speed: dict = None):
     plt.figure(figsize=(colSize, rowSize))
     draw_edges(graph)
     draw_vertices(graph)
+    if (graph_speed):
+        draw_speed(graph_speed)
     plt.axis("equal")
     plt.gca().invert_yaxis()
     plt.axis("off")
@@ -197,20 +262,24 @@ def draw_visited_vertices(vertices: list):
         plt.scatter(x, y, color="orange", s=150, edgecolors="black", zorder=3)
 
 
-def draw_path(graph: dict, rowSize: int, colSize: int, path: list, title: str, color: str):
+def draw_path(graph: dict, graph_speed: dict, rowSize: int, colSize: int, path: list, cur_speed: list, title: str, color: str):
     visited_vertices = []
+    i = 0
     for [x, y] in path:
         plt.figure(figsize=(colSize, rowSize))
         draw_edges(graph)
         draw_vertices(graph)
+        draw_speed(graph_speed)
         draw_visited_vertices(visited_vertices)
         plt.scatter(x, y, color=color, s=150, edgecolors="black", zorder=3)
         plt.axis("equal")
         plt.gca().invert_yaxis()
         plt.axis("off")
-        plt.title(title)
+        plt.title(f"Current recognized speed = {cur_speed[i] * 10}")
+        # plt.text(5, 5, f"Current recognized speed = {cur_speed[i]}", ha="center", fontsize=16)
         plt.show()
         visited_vertices.append((x, y))
+        i += 1
         
 # Wrapper
 def setup_lab(rowCount: int = 5, colCount: int = 5, edgeToDelCount: int = 5):
@@ -218,11 +287,14 @@ def setup_lab(rowCount: int = 5, colCount: int = 5, edgeToDelCount: int = 5):
     print(graph)
     draw_graph(graph, rowCount, colCount)
     graph = remove_random_edges(graph, edgeToDelCount, rowCount, colCount)
-    draw_graph(graph, rowCount, colCount)
+    graph_speed = generate_graph_speed(graph)
+    draw_graph(graph, rowCount, colCount, graph_speed)
 
-    agent = Agent(graph, (0, 0), (3, 4))
-    [path] = agent.move_to_goal()
+    agent = Agent(graph, graph_speed, (0, 0), (3, 4))
+    [path, total_speed, cur_speed, actual_total_speed] = agent.move_to_goal()
+    print('Total recognized speed =', total_speed)
+    print('Total actual speed =', actual_total_speed)
     print('path = ', path)
-    draw_path(graph, rowCount, colCount, path, 'Path', 'green')
+    draw_path(graph, graph_speed, rowCount, colCount, path, cur_speed, 'Path', 'green')
 
 setup_lab(5, 5, 10)
